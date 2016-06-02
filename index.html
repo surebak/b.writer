@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="style.css">
+    <title>breath writer</title>
+</head>
+
+<body>
+    <div class="panel">
+        <div class="btn">
+            <div></div>
+        </div>
+        <div id="lang" class="switch">
+            <h1>Language</h1>
+            <p class="on" data-lang='Ko'>한</p>
+            <p data-lang='En'>En</p>
+        </div>
+        <div id="speed" class="stepper">
+            <h1>Blinking(ms)</h1>
+            <input type="number" value='1000'>
+            <div class="minus">-</div>
+            <div class="plus">+</div>
+        </div>
+        <div class="cutline"></div>
+        <div class="mic">
+            <div class="volume"></div>
+        </div>
+    </div>
+    <div class="main">
+        <div class="sorter">
+            <div class="left on" data-panel='left'></div>
+            <div class="right" data-panel='right'></div>
+        </div>
+        <div class="input"></div>
+    </div>
+</body>
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script src="js/volume-meter.js"></script>
+<script src="js/hangul.min.js"></script>
+<script src="js/volume-listener.js"></script>
+<script>
+var speed = 1000;
+
+var letters = [];
+var letters_En = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '.', ',', '　'];
+var letters_Ko = ['ㄱ', 'ㄴ', 'ㄷ', 'ㄹ', 'ㅁ', 'ㅂ', 'ㅅ', 'ㅇ', 'ㅈ', 'ㅊ', 'ㅋ', 'ㅌ', 'ㅍ', 'ㅎ', 'ㄲ', 'ㄸ', 'ㅃ', 'ㅆ', 'ㅉ', 'ㅏ', 'ㅑ', 'ㅓ', 'ㅕ', 'ㅗ', 'ㅛ', 'ㅜ', 'ㅠ', 'ㅡ', 'ㅣ', 'ㅐ', 'ㅒ', 'ㅔ', 'ㅖ', '.', ',', '　'];
+var sum_letters = [];
+
+letters = letters_Ko;
+
+function init() {
+    $('.left').html('')
+    $('.right').html('')
+    var len_letter = letters.length;
+    var mid_val = parseInt(len_letter / 2);
+    var t_left = '';
+    var t_right = '';
+    for (var i = 0; i < mid_val; i++) {
+        $('<p>' + letters[i] + '</p>').appendTo($('.left'))
+    }
+    // $('.left').html(t_left);
+    for (var i = mid_val; i < len_letter; i++) {
+        $('<p>' + letters[i] + '</p>').appendTo($('.right'))
+    }
+    // $('.right').html(t_right);
+    $('.sorter p').each(function() {
+        if ($(this).html() == '　') {
+            $(this).addClass('space');
+        }
+    })
+}
+
+var the_interval = setInterval(function() {
+    $('.sorter > div').toggleClass('on');
+}, speed)
+
+init();
+
+function narrow() {
+    // var len_letter = $('.sorter .on p').length;
+    var len_letter = $('.sorter').find('.' + the_panel).find('p').length;
+    if (len_letter < 2) {
+        set_letter();
+        init();
+    } else {
+        var mid_val = parseInt(len_letter / 2);
+        var t_left = '';
+        var t_right = '';
+        for (var i = 1; i < mid_val + 1; i++) {
+            t_left += '<p>' + $('.sorter .on p:nth-of-type(' + i + ')').text() + '</p>'
+        }
+        for (var i = mid_val + 1; i < len_letter + 1; i++) {
+            t_right += '<p>' + $('.sorter .on p:nth-of-type(' + i + ')').text() + '</p>'
+        }
+        $('.left').html(t_left);
+        $('.right').html(t_right);
+    }
+    $('.sorter p').each(function() {
+        if ($(this).html() == '　') {
+            $(this).addClass('space');
+        }
+    })
+    re_interval()
+}
+
+function re_interval() {
+    clearInterval(the_interval);
+    the_interval = setInterval(function() {
+        $('.sorter > div').toggleClass('on');
+    }, speed)
+    $('#speed > input').val(speed);
+}
+
+function set_letter() {
+    // var t_letter = $('.sorter .on p').html();
+    var t_letter = $('.sorter').find('.' + the_panel).find('p').html()
+    console.log(t_letter)
+    sum_letters.push(t_letter);
+    console.log(Hangul.assemble(sum_letters));
+    // $("<p>" + t_letter + "</p>").appendTo($('.input'))
+    $('.input').html(Hangul.assemble(sum_letters))
+}
+
+$('.sorter').on('click', function() {
+    the_panel = $('.sorter > div.on').attr('data-panel');
+    narrow();
+})
+
+var the_cut = ($('.mic').height() - $('.cutline').offset().top) / $('.mic').height();
+var the_vol = 0;
+
+var if_over = 0;
+var max_vol = 0.8;
+var second_input = 0;
+
+var click_time;
+var over_time;
+var the_panel;
+
+function drawLoop(time) {
+    // draw a bar based on the current volume
+    //canvasContext.fillRect(0, 0, meter.volume*WIDTH*1.4, HEIGHT);
+    // console.log(meter.volume)
+    if (meter.volume > max_vol) {
+        max_vol = meter.volume
+    }
+    if (the_vol > the_cut) {
+        $('.mic .volume').css('background-color', '#FFC400')
+        if (if_over < 1) {
+            var d = new Date();
+            click_time = d.getTime();
+            if_over = 1;
+            the_panel = $('.sorter > div.on').attr('data-panel');
+            console.log(the_panel)
+        }
+    } else {
+        if (if_over > 0) {
+            var d = new Date();
+            over_time = d.getTime();
+            var delta = over_time - click_time;
+            if (delta > 800) {
+                init();
+                sum_letters.pop();
+                $('.input').html(Hangul.assemble(sum_letters))
+                console.log('delete', delta)
+                if_over = 0;
+                delta = 0;
+            } else if (delta > 500) {
+                init();
+                console.log('long', delta)
+                if_over = 0;
+                delta = 0;
+            } else if (delta > 300) {
+                narrow();
+                console.log('.', delta)
+                if_over = 0;
+                delta = 0;
+            }
+        }
+
+        $('.mic .volume').css('background-color', '')
+    }
+    $('.mic .volume').css('height', meter.volume / max_vol * 100 + '%')
+    $('.mic .volume').css('opacity', meter.volume / max_vol * 1 + 0.4)
+    the_vol = meter.volume / max_vol;
+
+    // set up the next visual callback
+    rafID = window.requestAnimationFrame(drawLoop);
+}
+$('.handle').on('touchstart', function() {
+    $(this).addClass('grabbed')
+});
+$('.handle').on('touchend', function() {
+    $(this).removeClass('grabbed')
+});
+
+$('.handle').on('touchmove', function(e) {
+    var the_move = e.originalEvent.touches[0].pageX - $('.controller').offset().left;
+    if (the_move < 0) {
+        the_move = 0;
+    }
+    if (the_move > $(this).parent().width()) {
+        the_move = $(this).parent().width()
+    }
+    $(this).css('left', the_move)
+    var percent = the_move / $(this).parent().width();
+    // console.log(percent)
+    control($(this).parent().attr('data-control'), percent)
+})
+
+
+
+$('.cutline').on('touchmove', function(e) {
+    var the_move = e.originalEvent.touches[0].pageY;
+    $(this).css('top', the_move)
+    the_cut = ($(window).height() - the_move) / $(window).height();
+    console.log(the_cut)
+})
+
+$('.cutline').on('mousedown', function(e) {
+    $('.cutline').addClass('grabbed');
+});
+$('.cutline').on('mouseup', function(e) {
+    $('.cutline').removeClass('grabbed');
+});
+$('.panel').on('mousemove', function(e) {
+    if ($('.cutline').hasClass('grabbed')) {
+        var the_move = e.pageY;
+        $('.cutline').css('top', the_move)
+        the_cut = ($(window).height() - the_move) / $(window).height();
+        console.log(the_cut)
+    }
+
+})
+
+$('#lang').on('click', function() {
+    $(this).find('p').toggleClass('on');
+    var t_lang = $(this).find('.on').attr('data-lang');
+    letters = window['letters_' + t_lang];
+    init();
+})
+
+function control(elem, val) {
+    if (elem == 'speed') {
+        var max_speed = 2000
+        var min_speed = 300
+        speed = (max_speed - min_speed) * val + min_speed;
+        console.log(speed)
+        clearInterval(the_interval);
+        the_interval = setInterval(function() {
+            $('.sorter > div').toggleClass('on');
+        }, speed)
+    }
+}
+
+$('.btn').on('click', function() {
+    $('body').toggleClass('control')
+})
+
+$('.stepper > .minus').on('click',function(){
+    speed-= 100;
+    if(speed<100){speed = 100}
+    re_interval();
+})
+
+$('.stepper > .plus').on('click',function(){
+    speed+= 100;
+    re_interval();
+})
+
+</script>
+
+</html>
